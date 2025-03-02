@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Mejorado</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { @apply bg-gray-900 text-white flex items-center justify-center h-screen; margin: 0; overflow: hidden; }
+        canvas { background: #000; display: block; }
+    </style>
+</head>
+<body>
+    <div class="absolute top-5 left-5 text-white text-lg">
+        <p>Puntuación: <span id="score">0</span></p>
+        <label for="speed">Velocidad:</label>
+        <input type="range" id="speed" min="100" max="1000" step="50" value="500">
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        const ROWS = 20, COLS = 10, SIZE = Math.min(canvas.width / COLS / 2, canvas.height / ROWS / 2);
+        const colors = ["cyan", "yellow", "purple", "green", "red", "blue", "orange"];
+        let score = 0, gameOver = false, dropSpeed = 500;
+        document.getElementById("speed").addEventListener("input", (e) => dropSpeed = e.target.value);
+        
+        const tetrominoes = [
+            [[1, 1, 1, 1]],
+            [[1, 1], [1, 1]],
+            [[1, 1, 0], [0, 1, 1]],
+            [[0, 1, 1], [1, 1, 0]],
+            [[1, 0, 0], [1, 1, 1]],
+            [[0, 0, 1], [1, 1, 1]],
+            [[0, 1, 0], [1, 1, 1]]
+        ];
+        
+        function getRandomPiece() {
+            let index = Math.floor(Math.random() * tetrominoes.length);
+            return { matrix: tetrominoes[index], x: 3, y: 0, color: colors[index] };
+        }
+        
+        let piece = getRandomPiece();
+        let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+        
+        function drawBoard() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            board.forEach((row, y) => row.forEach((value, x) => {
+                if (value) {
+                    ctx.fillStyle = value;
+                    ctx.fillRect(x * SIZE, y * SIZE, SIZE, SIZE);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect(x * SIZE, y * SIZE, SIZE, SIZE);
+                }
+            }));
+        }
+        
+        function drawPiece() {
+            ctx.fillStyle = piece.color;
+            piece.matrix.forEach((row, y) => row.forEach((value, x) => {
+                if (value) {
+                    ctx.fillRect((piece.x + x) * SIZE, (piece.y + y) * SIZE, SIZE, SIZE);
+                    ctx.strokeStyle = "black";
+                    ctx.strokeRect((piece.x + x) * SIZE, (piece.y + y) * SIZE, SIZE, SIZE);
+                }
+            }));
+        }
+        
+        function collide() {
+            return piece.matrix.some((row, y) => row.some((value, x) => {
+                let newY = piece.y + y;
+                let newX = piece.x + x;
+                return value && (newY >= ROWS || board[newY][newX]);
+            }));
+        }
+        
+        function mergePiece() {
+            piece.matrix.forEach((row, y) => row.forEach((value, x) => {
+                if (value) board[piece.y + y][piece.x + x] = piece.color;
+            }));
+        }
+        
+        function clearLines() {
+            board.forEach((row, i) => {
+                if (row.every(cell => cell)) {
+                    board.splice(i, 1);
+                    board.unshift(Array(COLS).fill(0));
+                    score += 10;
+                    document.getElementById("score").textContent = score;
+                }
+            });
+        }
+        
+        function movePiece(dx, dy) {
+            piece.x += dx;
+            if (collide()) piece.x -= dx;
+            piece.y += dy;
+            if (collide()) {
+                piece.y -= dy;
+                mergePiece();
+                clearLines();
+                piece = getRandomPiece();
+                if (collide()) gameOver = true;
+            }
+        }
+        
+        function rotatePiece() {
+            const rotated = piece.matrix[0].map((_, i) => piece.matrix.map(row => row[i])).reverse();
+            const oldMatrix = piece.matrix;
+            piece.matrix = rotated;
+            if (collide()) piece.matrix = oldMatrix;
+        }
+        
+        document.addEventListener("keydown", (e) => {
+            if (gameOver) return;
+            if (e.key === "ArrowLeft") movePiece(-1, 0);
+            if (e.key === "ArrowRight") movePiece(1, 0);
+            if (e.key === "ArrowDown") movePiece(0, 1);
+            if (e.key === "ArrowUp") rotatePiece();
+        });
+        
+        function update() {
+            if (!gameOver) {
+                movePiece(0, 1);
+                drawBoard();
+                drawPiece();
+                setTimeout(update, dropSpeed);
+            }
+        }
+        update();
+    </script>
+</body>
+</html>
